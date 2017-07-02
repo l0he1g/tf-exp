@@ -38,7 +38,7 @@ class RNN:
     predicts = tf.cast(tf.argmax(logits, 2), tf.int32)
     self._accuracy = tf.reduce_mean(tf.cast(tf.equal(predicts, self.ys), tf.float32))
     # optimize
-    self._train_step = tf.train.GradientDescentOptimizer(0.1).minimize(loss)
+    self._train_step = tf.train.AdamOptimizer(0.01).minimize(loss)
 
   def loss(self):
     return self._loss

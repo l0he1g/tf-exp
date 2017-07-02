@@ -14,6 +14,7 @@ def run():
   data = PaddedDataset(docs, batch_size=batch_size, filter_freq=5, min_doc_len=3, max_doc_len=10)
   rnn = RNN(data.voca_size, state_size=100, batch_size=batch_size)
 
+  saver = tf.train.Saver()
   with tf.Session() as sess:
     sess.run(tf.global_variables_initializer())
     n_batch = data.batch_nums()
@@ -27,6 +28,8 @@ def run():
         loss += i_loss
         accuracy += i_accuracy
 
+      if epoch % 100 ==99:
+        saver.save(sess, "myModel")
       print("epoch %d, loss=%f, accuracy=%f" % (epoch, loss/n_batch, accuracy/n_batch))
 
 def read_docs(data_pt):
