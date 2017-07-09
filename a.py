@@ -2,7 +2,7 @@
 import tensorflow as tf
 import numpy as np
 from tensorflow.contrib.rnn import LSTMCell
-from rnn.rnnUtil import  mask_weights
+from rnn.rnnUtil import  gen_mask
 
 if __name__ == '__main__':
   sess = tf.Session()

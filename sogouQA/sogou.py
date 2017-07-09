@@ -4,15 +4,8 @@ from sogouQA.model import RNN
 import json
 import tensorflow as tf
 
-n_epochs = 100
-batch_size = 64
-
-def run():
-  data_pt = "D:/mp/tf-exp/resources/test/train.1.json"
-  docs = read_docs(data_pt)
-  print("n(doc)=%d" % len(docs))
-  data = PaddedDataset(docs, batch_size=batch_size, filter_freq=5, min_doc_len=3, max_doc_len=10)
-  rnn = RNN(data.voca_size, state_size=100, batch_size=batch_size)
+def train(data, n_epochs):
+  rnn = RNN(data.voca_size, state_size=state_size, batch_size=batch_size)
 
   saver = tf.train.Saver()
   with tf.Session() as sess:
@@ -24,18 +17,39 @@ def run():
         xs, ys, lengths = data.next_batch()
         feeds = {rnn.xs: xs, rnn.ys: ys, rnn.lengths: lengths}
         i_loss, i_accuracy, _ = sess.run([rnn.loss(), rnn.accuracy(), rnn.train_step()],
-                                   feed_dict=feeds)
+                                         feed_dict=feeds)
         loss += i_loss
         accuracy += i_accuracy
 
-      if epoch % 100 ==99:
-        saver.save(sess, "myModel")
-      print("epoch %d, loss=%f, accuracy=%f" % (epoch, loss/n_batch, accuracy/n_batch))
+      if epoch % 100 == 1:
+        print("save model")
+        saver.save(sess, model_pt)
+      print("epoch %d, loss=%f, accuracy=%f" % (epoch, loss / n_batch, accuracy / n_batch))
+
 
 def read_docs(data_pt):
   rf = open(data_pt, encoding="utf-8")
-  return  [json.loads(line)["query"] for line in rf]
+  return [json.loads(line)["query"] for line in rf]
+
+def infer():
+  rnn = RNN(train_data.voca_size, state_size=state_size, batch_size=1)
+  saver = tf.train.Saver()
+  with tf.Session() as sess:
+    saver.restore(sess, model_pt)
 
 
 if __name__ == '__main__':
-  run()
+  batch_size = 64
+  state_size = 100
+  data_pt = "D:/mp/tf-exp/resources/test/train.1.json"
+  model_pt = "D:/mp/tf-exp/sogouQA/myModel/model.ckpt"
+
+  docs = read_docs(data_pt)
+  print("n(doc)=%d" % len(docs))
+  train_data = PaddedDataset(docs, batch_size=batch_size, filter_freq=5,
+                             min_doc_len=3, max_doc_len=10)
+
+  train(train_data, n_epochs = 2)
+
+  test_data = train_data
+  infer(test_data)

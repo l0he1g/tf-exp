@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*- 
 import tensorflow as tf
 import numpy as np
-from rnn.rnnUtil import mask_weights
+from rnn.rnnUtil import gen_mask
 
 class RNN:
   def __init__(self, voca_size,
@@ -14,7 +14,7 @@ class RNN:
     self.ys = tf.placeholder(tf.int32, [batch_size, None])
 
     num_steps = tf.shape(self.xs)[1]
-    weights = mask_weights(num_steps, self.lengths)
+    weights = gen_mask(num_steps, self.lengths)
     # embedding
 
     W = tf.get_variable("embedding", [voca_size, state_size], dtype=tf.float32)
@@ -22,10 +22,12 @@ class RNN:
 
     # RNN
     cell = tf.contrib.rnn.LSTMCell(state_size)
+    initial_state = cell.zero_states(batch_size, tf.float32)
     outputs, states = tf.nn.dynamic_rnn(cell,
                                         inputs=embed_xs,
                                         sequence_length=self.lengths,
-                                        dtype=tf.float32)
+                                        dtype=tf.float32,
+                                        initial_state=initial_state)
 
     softmax_W = tf.get_variable("softmax_W", [state_size, voca_size+1], dtype=tf.float32)
     softmax_b = tf.get_variable("softmax_b", [voca_size+1], dtype=tf.float32)
@@ -35,8 +37,8 @@ class RNN:
     loss = tf.contrib.seq2seq.sequence_loss(logits, self.ys, weights)
     self._loss = tf.reduce_sum(loss) / batch_size
     # compute accuracy
-    predicts = tf.cast(tf.argmax(logits, 2), tf.int32)
-    self._accuracy = tf.reduce_mean(tf.cast(tf.equal(predicts, self.ys), tf.float32))
+    self._predicts = tf.cast(tf.argmax(logits, 2), tf.int32)
+    self._accuracy = tf.reduce_mean(tf.cast(tf.equal(self._predicts, self.ys), tf.float32))
     # optimize
     self._train_step = tf.train.AdamOptimizer(0.01).minimize(loss)
 
@@ -48,6 +50,9 @@ class RNN:
 
   def train_step(self):
     return self._train_step
+
+  def predict(self):
+    return self._predicts
 
 
 
