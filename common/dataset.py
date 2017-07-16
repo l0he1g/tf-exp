@@ -67,7 +67,7 @@ class PaddedDataset:
     return len(self.docs) // self.batch_size
 
 def run():
-  pt = "../resources/test/test.txt"
+  pt = "../resources/test/docs.txt"
   lines = open(pt, encoding="utf-8")
   data = PaddedDataset(lines, False, min_doc_len=3, batch_size=2)
   batch = data.next_batch()

@@ -1,66 +1,74 @@
 # -*- coding: utf-8 -*- 
 import tensorflow as tf
-import numpy as np
 from rnn.rnnUtil import gen_mask
 
+
 class RNN:
-  def __init__(self, voca_size,
-               state_size=5,
-               kept_prob=1,
-               batch_size=2):
-    """build the RNN Graph"""
-    self.xs = tf.placeholder(tf.int32, [batch_size, None])
-    self.lengths = tf.placeholder(tf.int32, [batch_size])
-    self.ys = tf.placeholder(tf.int32, [batch_size, None])
-
-    num_steps = tf.shape(self.xs)[1]
-    weights = gen_mask(num_steps, self.lengths)
+  def __init__(self, voca_size, state_size, xs, ys, lengths):
+    """build the RNN Graph for training"""
+    batch_size = tf.shape(xs)[0]
+    num_steps = tf.shape(xs)[1]
+    weights = gen_mask(num_steps, lengths)
     # embedding
+    with tf.name_scope("model"):
+      W = tf.get_variable("embedding", [voca_size, state_size], dtype=tf.float32)
+      embed_xs = tf.nn.embedding_lookup(W, xs)
 
-    W = tf.get_variable("embedding", [voca_size, state_size], dtype=tf.float32)
-    embed_xs = tf.nn.embedding_lookup(W, self.xs)
+      cell = tf.contrib.rnn.LSTMCell(state_size)
+      initial_state = cell.zero_state(batch_size, tf.float32)
+      # output shape: [batch_size, num_steps, output_size]
+      # last_states: [batch_size, state_size]
+      outputs, last_states = tf.nn.dynamic_rnn(cell,
+                                          inputs=embed_xs,
+                                          sequence_length=lengths,
+                                          dtype=tf.float32,
+                                          initial_state=initial_state)
 
-    # RNN
-    cell = tf.contrib.rnn.LSTMCell(state_size)
-    initial_state = cell.zero_states(batch_size, tf.float32)
-    outputs, states = tf.nn.dynamic_rnn(cell,
-                                        inputs=embed_xs,
-                                        sequence_length=self.lengths,
-                                        dtype=tf.float32,
-                                        initial_state=initial_state)
+      softmax_W = tf.get_variable("softmax_W", [state_size, voca_size], dtype=tf.float32)
+      softmax_b = tf.get_variable("softmax_b", [voca_size], dtype=tf.float32)
 
-    softmax_W = tf.get_variable("softmax_W", [state_size, voca_size+1], dtype=tf.float32)
-    softmax_b = tf.get_variable("softmax_b", [voca_size+1], dtype=tf.float32)
-    flat_outputs = tf.reshape(outputs, [batch_size * num_steps, state_size])
-    flat_logits = tf.matmul(flat_outputs, softmax_W) + softmax_b
-    logits = tf.reshape(flat_logits, [batch_size, num_steps, voca_size + 1])
-    loss = tf.contrib.seq2seq.sequence_loss(logits, self.ys, weights)
-    self._loss = tf.reduce_sum(loss) / batch_size
+    with tf.name_scope("loss"):
+      # 将3-dim tensor转换为Matrix，方便矩阵运算
+      flat_outputs = tf.reshape(outputs, [-1, state_size])
+      flat_logits = tf.matmul(flat_outputs, softmax_W) + softmax_b
+      logits = tf.reshape(flat_logits, [batch_size, num_steps, voca_size])
+      loss = tf.contrib.seq2seq.sequence_loss(logits, ys, weights)
+      self.loss = tf.reduce_sum(loss) / tf.cast(batch_size, tf.float32)
+
     # compute accuracy
-    self._predicts = tf.cast(tf.argmax(logits, 2), tf.int32)
-    self._accuracy = tf.reduce_mean(tf.cast(tf.equal(self._predicts, self.ys), tf.float32))
-    # optimize
-    self._train_step = tf.train.AdamOptimizer(0.01).minimize(loss)
+    self.predicts = tf.cast(tf.argmax(logits, 2), tf.int32)
+    self.accuracy = tf.reduce_mean(tf.cast(tf.equal(self.predicts, ys), tf.float32))
 
-  def loss(self):
-    return self._loss
-
-  def accuracy(self):
-    return self._accuracy
-
-  def train_step(self):
-    return self._train_step
-
-  def predict(self):
-    return self._predicts
+    with tf.name_scope("optimize"):
+      # optimize
+      self.train_op = tf.train.AdamOptimizer(0.01).minimize(loss)
 
 
+class RNNInfer:
+  def __init__(self, voca_size, state_size):
+    """build the RNN Graph for inference"""
+    self.xs = tf.placeholder(tf.int32, [1, None], "input")
+    num_steps = tf.shape(self.xs)[1]
+    with tf.name_scope("model"):
+      W = tf.get_variable("embedding", [voca_size, state_size], dtype=tf.float32)
+      embed_xs = tf.nn.embedding_lookup(W, self.xs)
 
-if __name__ == '__main__':
-  xs = tf.placeholder(tf.float32, [None, None])
-  xs_ = np.random.rand(2, 4)
-  print(xs_)
-  with tf.Session() as sess:
-    sess.run(tf.global_variables_initializer())
-    print()
-    print(sess.run(xs, feed_dict={xs: xs_}))
+      cell = tf.contrib.rnn.LSTMCell(state_size)
+      self.initial_state = cell.zero_state(1, tf.float32)
+      # output shape: [batch_size, num_steps, output_size]
+      # last_states: [batch_size, state_size]
+      outputs, last_states = tf.nn.dynamic_rnn(cell,
+                                          inputs=embed_xs,
+                                          sequence_length=[num_steps],
+                                          dtype=tf.float32,
+                                          initial_state=self.initial_state)
+
+      softmax_W = tf.get_variable("softmax_W", [state_size, voca_size], dtype=tf.float32)
+      softmax_b = tf.get_variable("softmax_b", [voca_size], dtype=tf.float32)
+
+    # generate a predict
+    flat_outputs = tf.reshape(outputs, [-1, state_size])
+    flat_logits = tf.matmul(flat_outputs, softmax_W) + softmax_b
+    self.logits = tf.reshape(flat_logits, [1, num_steps, voca_size])
+    self.predicts = tf.cast(tf.argmax(self.logits, 2), tf.int32)
+    self.last_states = last_states

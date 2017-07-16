@@ -1,55 +1,77 @@
-# -*- coding: utf-8 -*- 
-from common.dataset import PaddedDataset
-from sogouQA.model import RNN
-import json
+# -*- coding: utf-8 -*-
+import sys
+from sogouQA.model import RNN, RNNInfer
+from sogouQA import voca, data_utils
 import tensorflow as tf
 
-def train(data, n_epochs):
-  rnn = RNN(data.voca_size, state_size=state_size, batch_size=batch_size)
+data_dir = "/Users/yxh/mp/tf-exp/resources/test/"
+train_pt = data_dir + "dwid.txt"
+voca_pt = data_dir + "voca.txt"
+model_pt = data_dir + "model/model.ckpt"
+
+w2id = voca.load_w2id(voca_pt)
+id2w = voca.load_id2w(voca_pt)
+voca_size = len(w2id)
+batch_size = 64
+state_size = 100
+max_iter = 3000
+
+
+def train():
+  data = data_utils.create_lm_dataset(train_pt, batch_size)
+  iterator = data.make_one_shot_iterator()
+  xs, ys, lengths = iterator.get_next()
+
+  rnn = RNN(voca_size, state_size, xs, ys, lengths)
 
   saver = tf.train.Saver()
   with tf.Session() as sess:
     sess.run(tf.global_variables_initializer())
-    n_batch = data.batch_nums()
-    for epoch in range(n_epochs):
-      loss, accuracy = (0.0, 0.0)
-      for i in range(n_batch):
-        xs, ys, lengths = data.next_batch()
-        feeds = {rnn.xs: xs, rnn.ys: ys, rnn.lengths: lengths}
-        i_loss, i_accuracy, _ = sess.run([rnn.loss(), rnn.accuracy(), rnn.train_step()],
-                                         feed_dict=feeds)
-        loss += i_loss
-        accuracy += i_accuracy
 
-      if epoch % 100 == 1:
-        print("save model")
+    loss, accuracy = (0.0, 0.0)
+    for iter in range(max_iter):
+      i_loss, i_accuracy, _ = sess.run([rnn.loss, rnn.accuracy, rnn.train_op])
+      loss += i_loss
+      accuracy += i_accuracy
+
+      if iter % 100 == 99:
         saver.save(sess, model_pt)
-      print("epoch %d, loss=%f, accuracy=%f" % (epoch, loss / n_batch, accuracy / n_batch))
+        print("save model:" + model_pt)
+        print("iter %d, loss=%f, accuracy=%f" % (iter, loss / 100, accuracy / 100))
+        loss, accuracy = (0.0, 0.0)
 
 
-def read_docs(data_pt):
-  rf = open(data_pt, encoding="utf-8")
-  return [json.loads(line)["query"] for line in rf]
+def infer(start):
+  print("infer:\n" + start, flush=True)
+  ws = [w2id[w] for w in voca.cn_tokenizer(start)]
 
-def infer():
-  rnn = RNN(train_data.voca_size, state_size=state_size, batch_size=1)
+  rnn = RNNInfer(voca_size, state_size)
   saver = tf.train.Saver()
   with tf.Session() as sess:
+    print("model_pt:" + model_pt)
+    # save_pt = tf.train.latest_checkpoint(model_pt)
+    # print("restore:" + save_pt)
     saver.restore(sess, model_pt)
+    logits, ys, last_states = sess.run([rnn.logits, rnn.predicts, rnn.last_states], feed_dict={rnn.xs: [ws]})
+    print("logits:", end=" ")
+    print(logits)
+    print("ys:", end=" ")
+    print(ys)
+    print("predict seq=" + " ".join([id2w[y] for y in ys[0]]), flush=True)
+    print("衍生预测开始")
+    for i in range(10):
+      feeds = {rnn.xs: [ws]}
+      ys, last_states = sess.run([rnn.predicts, rnn.last_states], feed_dict=feeds)
+      ws = ws + [ys[0][-1]]
+      print("input:" + " ".join([id2w[y] for y in ws]), flush=True)
+      print("output:" + " ".join([id2w[y] for y in ys[0]]), flush=True)
 
 
 if __name__ == '__main__':
-  batch_size = 64
-  state_size = 100
-  data_pt = "D:/mp/tf-exp/resources/test/train.1.json"
-  model_pt = "D:/mp/tf-exp/sogouQA/myModel/model.ckpt"
-
-  docs = read_docs(data_pt)
-  print("n(doc)=%d" % len(docs))
-  train_data = PaddedDataset(docs, batch_size=batch_size, filter_freq=5,
-                             min_doc_len=3, max_doc_len=10)
-
-  train(train_data, n_epochs = 2)
-
-  test_data = train_data
-  infer(test_data)
+  train()
+  print("please input a start:")
+  # start = sys.stdin.readline()
+  # start = "西安一住三星期"
+  # while start:
+  #    infer(start)
+    # start = sys.stdin.readline()
