@@ -1,12 +1,11 @@
 # -*- coding: utf-8 -*-
-import sys
 from sogouQA.model import RNN, RNNInfer
 from sogouQA import voca, data_utils
 import tensorflow as tf
 
 data_dir = "/Users/yxh/mp/tf-exp/resources/test/"
 train_pt = data_dir + "dwid.txt"
-voca_pt = data_dir + "voca.txt"
+voca_pt = data_dir + "voca.py.txt"
 model_pt = data_dir + "model/model.ckpt"
 
 w2id = voca.load_w2id(voca_pt)
@@ -68,10 +67,10 @@ def infer(start):
 
 
 if __name__ == '__main__':
-  train()
+  #train()
   print("please input a start:")
-  # start = sys.stdin.readline()
-  # start = "西安一住三星期"
-  # while start:
-  #    infer(start)
-    # start = sys.stdin.readline()
+  #start = sys.stdin.readline()
+  start = "qq"
+  #while start:
+  infer(start)
+#    start = sys.stdin.readline()

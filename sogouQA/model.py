@@ -32,8 +32,7 @@ class RNN:
       flat_outputs = tf.reshape(outputs, [-1, state_size])
       flat_logits = tf.matmul(flat_outputs, softmax_W) + softmax_b
       logits = tf.reshape(flat_logits, [batch_size, num_steps, voca_size])
-      loss = tf.contrib.seq2seq.sequence_loss(logits, ys, weights)
-      self.loss = tf.reduce_sum(loss) / tf.cast(batch_size, tf.float32)
+      self.loss = tf.contrib.seq2seq.sequence_loss(logits, ys, weights)
 
     # compute accuracy
     self.predicts = tf.cast(tf.argmax(logits, 2), tf.int32)

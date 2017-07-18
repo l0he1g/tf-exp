@@ -13,7 +13,7 @@ def run():
   with open(doc_pt, "w", encoding="utf-8") as wf:
     wf.write("\n".join(docs))
 
-  voca_pt = data_dir + "voca.txt"
+  voca_pt = data_dir + "voca.py.txt"
   dwid_pt = data_dir + "dwid.txt"
   fit_and_transform(doc_pt, voca_pt, dwid_pt, 1, cn_tokenizer)
 

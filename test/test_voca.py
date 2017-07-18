@@ -4,7 +4,7 @@ import unittest
 
 test_dir = "/Users/yxh/mp/tf-exp/resources/test/"
 doc_pt = test_dir + "docs.txt"
-voca_pt = test_dir + "voca.txt"
+voca_pt = test_dir + "voca.py.txt"
 dwid_pt = test_dir + "dwid.txt"
 
 class VocaTest:
